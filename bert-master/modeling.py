@@ -29,7 +29,7 @@ import tensorflow as tf
 
 
 class BertConfig(object):
-  """Configuration for `BertModel`."""
+  """`BertModel`配置类."""
 
   def __init__(self,
                vocab_size,#语料库大小
@@ -43,9 +43,9 @@ class BertConfig(object):
                max_position_embeddings=512,
                type_vocab_size=16,
                initializer_range=0.02):
-    """Constructs BertConfig.
+    """构建BertConfig.
 
-    Args:
+    参数:
       vocab_size: Vocabulary size of `inputs_ids` in `BertModel`.语料库的大小
       hidden_size: Size of the encoder layers and the pooler layer.encoder层的大小
       num_hidden_layers: Number of hidden layers in the Transformer encoder.隐藏层的数量
@@ -127,7 +127,7 @@ class BertModel(object):
   ```
   """
 ####额外说一句，这里的模型定义其实已经做好了模型的前向传播工作，里面的一些值看似是在初始化，但是其实已经完成计算了
-  #也就是说，在完成了构造函数之后，模型的前向传播已经做好了
+  #也就是说，在完成了构造函数之后，模型的前向传播已经做好了，这个和pytorch的做法还蛮不一样，这个观点在后面看来是错的，这即定义了网络结构，也定义了前向传播路径，但是没有真的进行前向传播
   def __init__(self,
                config,
                is_training,
@@ -173,7 +173,7 @@ class BertModel(object):
     ####首先第一步应该做好全部的嵌入工作，拿到真正要输入到模型里的词嵌入向量列表
     with tf.variable_scope(scope, default_name="bert"):
       with tf.variable_scope("embeddings"):
-        # 对word的id执行embedding lookup.获取到word id到embedding向量，以及嵌入查找表，这个嵌入查找表在训练中会进行更新哦
+        # 对word的id执行embedding lookup.获取到word id的embedding向量，以及嵌入查找表，这个嵌入查找表在训练中会进行更新哦
         (self.embedding_output, self.embedding_table) = embedding_lookup(
             input_ids=input_ids,#输入的id
             vocab_size=config.vocab_size,#词库的大小 30522
@@ -220,8 +220,8 @@ class BertModel(object):
             do_return_all_layers=True)#是否返回每一层的输出
     ####到这里我们就把编码器全部计算完了，得到了我们的最终输出的向量
       self.sequence_output = self.all_encoder_layers[-1]
-      # The "pooler" converts the encoded sequence tensor of shape
-      # [batch_size, seq_length, hidden_size] to a tensor of shape
+      # “pooler”将编码后的序列张量从形状
+      # [batch_size, seq_length, hidden_size] 到形状
       # [batch_size, hidden_size]. This is necessary for segment-level
       # (or segment-pair-level) classification tasks where we need a fixed
       # dimensional representation of the segment.
@@ -234,7 +234,9 @@ class BertModel(object):
             config.hidden_size,
             activation=tf.tanh,
             kernel_initializer=create_initializer(config.initializer_range))
+      ##### 到这里，我们创建了一个模型，并且进行了前向传播，保存了每一步的输出
 
+  #获取池化后的输出，就是第一个token
   def get_pooled_output(self):
     return self.pooled_output
 
@@ -247,6 +249,7 @@ class BertModel(object):
     """
     return self.sequence_output
 
+  #获取所有编码器层
   def get_all_encoder_layers(self):
     return self.all_encoder_layers
 
@@ -436,7 +439,7 @@ def embedding_postprocessor(input_tensor,#做了embedding之后的输出,大小�
                             dropout_prob=0.1):
   """执行词嵌入张量的的后处理
 
-  Args:
+  参数:
     input_tensor: float 张量 [batch_size, seq_length,embedding_size].
     use_token_type: bool. 是否加入token_type_id的嵌入
     token_type_ids: (可选) int32 张量 [batch_size, seq_length].
@@ -451,11 +454,11 @@ def embedding_postprocessor(input_tensor,#做了embedding之后的输出,大小�
     max_position_embeddings: int. 在这个模型中可能使用的最大序列长度，可能比最长的输入序列长度还长，但是不能更短
     dropout_prob: float. 应用在最终输出张量的失活率.
 
-  Returns:
+  返回值:
     返回值矩阵大小和input_tensor是相同的,只不过是加入了位置信息等等
     float 和 `input_tensor`大小相同的张量.
 
-  Raises:
+  异常:
     ValueError: One of the tensor shapes or input values is invalid.
   """
   ##(8, 128, 768) 8个batch,每个batch128个token,每个token embedding768维度

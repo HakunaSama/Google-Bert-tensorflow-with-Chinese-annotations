@@ -123,21 +123,16 @@ flags.DEFINE_integer(
     "num_tpu_cores", 8,
     "Only used if `use_tpu` is True. Total number of TPU cores to use.")
 
-
+# 输入样本类，这个类只是简单的封装了以下样本索引
 class InputExample(object):
-  """A single training/test example for simple sequence classification."""
-
+  """这是一个用于简单序列分类的单个训练/测试样本。"""
   def __init__(self, guid, text_a, text_b=None, label=None):
-    """Constructs a InputExample.
-
-    Args:
-      guid: Unique id for the example.
-      text_a: string. The untokenized text of the first sequence. For single
-        sequence tasks, only this sequence must be specified.
-      text_b: (Optional) string. The untokenized text of the second sequence.
-        Only must be specified for sequence pair tasks.
-      label: (Optional) string. The label of the example. This should be
-        specified for train and dev examples, but not for test examples.
+    """构造函数，构造样本.
+    参数:
+      guid: 样本索引.
+      text_a: string. 未分词的第一个句子
+      text_b: (Optional) string. 未分词的第二个序列，有的任务是没有第二个句子的.
+      label: (Optional) string. 样本标签，训练和验证样本有，测试样本没有哦
     """
     self.guid = guid
     self.text_a = text_a
@@ -157,9 +152,9 @@ class PaddingInputExample(object):
   battches could cause silent errors.
   """
 
-
+# 输入特征类，和InputExample做区分哦，InputExample里就是存没处理的字符串，InputFeatures存处理过的id、mask、typeid等等
 class InputFeatures(object):
-  """A single set of features of data."""
+  """一个数据特征的结构体"""
 
   def __init__(self,
                input_ids,
@@ -173,7 +168,7 @@ class InputFeatures(object):
     self.label_id = label_id
     self.is_real_example = is_real_example
 
-# 数据处理
+# 数据处理的基类
 class DataProcessor(object):
   """Base class for data converters for sequence classification data sets."""
 
@@ -377,10 +372,17 @@ class ColaProcessor(DataProcessor):
           InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
     return examples
 
-# 将单个数据转换成特征函数
+# 将单个样本转换成特征函数
 def convert_single_example(ex_index, example, label_list, max_seq_length,
                            tokenizer):
-  """将单个输入数据转成单个输入特征."""
+  """将单个样本转成单个输入特征.
+  参数：
+    ex_index：样本的索引
+    example：样本
+    label_list：样本可能有的标签值
+    max_seq_length：样本的最大序列长度
+    tokenizer：处理样本用的分词器
+  """
 
   if isinstance(example, PaddingInputExample):
     return InputFeatures(
@@ -429,18 +431,18 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
   # 请注意，这只有在整个模型经过微调的情况下才有意义。
 
   # 现在我们已经有了切分好的两个或者一个句子的token，长度满足要求，但是还没有特殊标记，
-  # 现在要做一个带有标记并且完整的tokens及其id
+  # 现在要做一个带有标记并且完整的tokens及其ids
   tokens = []# 初始化 tokens 和 segment_ids 的列表，用于存储最终的 token 序列和对应的哪个句子的标记，也就是token_type_ids
   segment_ids = []
-  tokens.append("[CLS]")
-  segment_ids.append(0)
-  for token in tokens_a:
+  tokens.append("[CLS]")#两个都加上特殊标记
+  segment_ids.append(0)#特殊标记属于第一句话
+  for token in tokens_a:#把第一句话的token一个一个加进来
     tokens.append(token)
-    segment_ids.append(0)
-  tokens.append("[SEP]")
-  segment_ids.append(0)
+    segment_ids.append(0)#第一句话的标记是0
+  tokens.append("[SEP]")#再加一个隔断特殊标记
+  segment_ids.append(0)#隔断特殊标记也是属于第一句话的
 
-  if tokens_b:
+  if tokens_b:#这就不详细说了，跟上面一样的
     for token in tokens_b:
       tokens.append(token)
       segment_ids.append(1)
@@ -478,7 +480,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
     tf.logging.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
     tf.logging.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
     tf.logging.info("label: %s (id = %d)" % (example.label, label_id))
-  # 构建当前样本的特征对象
+  # 构建当前样本的输入特征，相比较与InputExample，InputFeatures存的不只是两句话的字符串了，而是处理好的tokenid、mask、typeid这些信息
   feature = InputFeatures(
       input_ids=input_ids,#样本的token的id
       input_mask=input_mask,#样本的token的mask
@@ -488,18 +490,18 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
   return feature
 
 
-# 基于文件将输入数据转成特征的函数
+# 基于文件将输入样本转成特征的函数
 def file_based_convert_examples_to_features(
     examples, label_list, max_seq_length, tokenizer, output_file):
   """将一组 `InputExample` 转换为 TFRecord 文件."""
 
   writer = tf.python_io.TFRecordWriter(output_file)
 
-  for (ex_index, example) in enumerate(examples):# 遍历3688个数据
+  for (ex_index, example) in enumerate(examples):# 遍历3688个样本
     if ex_index % 10000 == 0:#每隔10000次打印一下处理结果，我们不够10000次，不会显示的
       tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
 
-    #核心函数，转换单个样本为特征
+    #核心函数，转换单个样本为特征，这个函数要点进去看，Example和Feature的区别是Feature是处理过的，有id、mask、typeid等，样本就是字符串
     feature = convert_single_example(ex_index, example, label_list,
                                      max_seq_length, tokenizer)
 
@@ -507,7 +509,7 @@ def file_based_convert_examples_to_features(
       f = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
       return f
 
-    # 这里就是全部转成int而已，并且存入到features字典里
+    # 这里就是全部转成int而已，并且存入到features字典里，这里其实感觉有点多此一举，直接在InputFeatures里转好返回字典应该也可以
     features = collections.OrderedDict()
     features["input_ids"] = create_int_feature(feature.input_ids)
     features["input_mask"] = create_int_feature(feature.input_mask)
@@ -516,17 +518,17 @@ def file_based_convert_examples_to_features(
     features["is_real_example"] = create_int_feature(
         [int(feature.is_real_example)])
 
-    # 基本操作，到这里数据就全部做成tfrecoder了
+    # 基本操作，把数据做成tfRecoder了，我不太懂tensorflow，但是tfRecoder的作用相当于dataloader
     tf_example = tf.train.Example(features=tf.train.Features(feature=features))
     writer.write(tf_example.SerializeToString())
   writer.close()
 
-
+#这个函数用于构建一个“输入函数”（input_fn），这个输入函数将传递给 TPUEstimator，用于读取和处理 TFRecord 格式的数据。
 def file_based_input_fn_builder(input_file, seq_length, is_training,
                                 drop_remainder):
-  """Creates an `input_fn` closure to be passed to TPUEstimator."""
+  """创建一个传递给 TPUEstimator 的 input_fn 闭包。"""
 
-  name_to_features = {
+  name_to_features = {# 定义了 TFRecord 中每个样本的特征及其类型和形状，例如 "input_ids"、"input_mask"、"segment_ids" 等。这些定义告诉 TensorFlow 如何解析每条记录。
       "input_ids": tf.FixedLenFeature([seq_length], tf.int64),
       "input_mask": tf.FixedLenFeature([seq_length], tf.int64),
       "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
@@ -535,11 +537,12 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
   }
 
   def _decode_record(record, name_to_features):
-    """Decodes a record to a TensorFlow example."""
+    """将一条记录解码为 TensorFlow 样本。"""
+    #使用 tf.parse_single_example 根据 name_to_features 来解析记录。
     example = tf.parse_single_example(record, name_to_features)
 
-    # tf.Example only supports tf.int64, but the TPU only supports tf.int32.
-    # So cast all int64 to int32.
+    # tf.Example 只支持 tf.int64，但是 TPU 只支持 tf.int32。
+    # 因此，需要将所有 int64 类型转换为 int32 类型。
     for name in list(example.keys()):
       t = example[name]
       if t.dtype == tf.int64:
@@ -548,14 +551,14 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
 
     return example
 
-  def input_fn(params):
-    """The actual input function."""
+  def input_fn(params):#接受一个 params 字典（其中包含 batch_size），用于设置批量大小。
+    """实际的输入函数。"""
     batch_size = params["batch_size"]
 
-    # For training, we want a lot of parallel reading and shuffling.
-    # For eval, we want no shuffling and parallel reading doesn't matter.
-    d = tf.data.TFRecordDataset(input_file)
-    if is_training:
+    # 对于训练，我们希望大量并行读取数据并进行打乱。
+    # 对于评估，则不需要打乱数据，并且并行读取的要求也不那么严格。
+    d = tf.data.TFRecordDataset(input_file)#使用 tf.data.TFRecordDataset 读取指定的 input_file。
+    if is_training:#如果处于训练模式（is_training 为 True），则对数据集进行无限重复（repeat）和打乱（shuffle），以增加训练的随机性。
       d = d.repeat()
       d = d.shuffle(buffer_size=100)
 
@@ -567,7 +570,7 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
 
     return d
 
-  return input_fn
+  return input_fn#返回这个 input_fn 闭包，供 TPUEstimator 在训练或评估时调用，从而构建出数据输入管道。
 
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
@@ -586,46 +589,64 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
     else:
       tokens_b.pop()
 
-
+#####这里和pytorch太不一样了，以至于很容易迷惑，pytorch是定义好每个层，在定义前向传播函数
+# 这个函数实际上既在“创建”模型，也在定义模型的前向传播过程。这里的模型创建和前向传播是在TensorFlow 的静态计算图（graph）中完成的，而不是像 PyTorch 那样定义一个对象再调用 forward 方法。
+# 详细解释：
+#   1.计算图的构建
+#       在 TensorFlow 1.x 中，模型不是一个运行时对象，而是一系列操作（ops）构成的计算图。create_model 函数会创建并添加这些操作到计算图中。
+#       这里的每个操作（比如调用 modeling.BertModel、tf.nn.dropout、tf.matmul、tf.nn.softmax 等）都只是图中的一个节点，只有在 Session 运行时才会真正计算。
+#   2.模型创建与前向传播
+#       模型创建：调用 modeling.BertModel 实际上会根据 bert_config 创建 BERT 模型的各个层（比如嵌入层、Transformer 层等），并将这些层及其参数（变量）加入计算图中。
+#       前向传播：接下来，通过 model.get_pooled_output() 取到对应 [CLS] 的表示，再接一个 dropout 层和一个全连接层（线性变换、加偏置），最后计算 softmax 得到预测概率，以及计算交叉熵损失。整个过程定义了输入数据经过各层转换后如何输出最终的预测和损失。
+#   3.与 PyTorch 的区别
+#       PyTorch：模型一般写成一个类，继承自 nn.Module，里面的 forward 方法定义了前向传播逻辑，执行时会动态构建计算过程（动态图模式）。
+#       TensorFlow 1.x：则是在定义阶段（模型构建阶段）就构建好了整个计算图，所有的前向传播步骤都是图中的节点，之后需要通过 Session 运行这些节点得到输出。函数看起来像是“直接计算”结果，但实际上只是定义了如何计算。
 def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
                  labels, num_labels, use_one_hot_embeddings):
   """创建一个分类模型."""
+  #### 什么都别管，先创建模型再说，请记住这里不仅仅是创建模型，还对当前的batch进行了前向传播
   model = modeling.BertModel(
       config=bert_config,
-      is_training=is_training,# 8是指8个batch，128是指每个序列最大长度为128，不够的填充，多的截断
-      input_ids=input_ids,#（8,128），每一个值存的是token的id
+      is_training=is_training,
+      input_ids=input_ids,#（8,128），每一个值存的是token的id，8是指8个batch，128是指每个序列最大长度为128，不够的填充，多的截断
       input_mask=input_mask,#（8,128），被填充的位置为0，真实token的位置为1
       token_type_ids=segment_ids,#（8,128），每一个值存的是位置的类型，0代表属于第一句话，1代表属于第二句话
       use_one_hot_embeddings=use_one_hot_embeddings)
 
-  # 在演示中，我们对整个片段（segment）执行一个简单的分类任务，也就是获取到了《cls》的embedding。
+  # 在演示中，我们对整个片段（segment）执行一个简单的分类任务，也就是获取到了<cls>的表示。
   # 如果你想使用token 级别的输出，请使用 model.get_sequence_output()。
   output_layer = model.get_pooled_output()
 
   hidden_size = output_layer.shape[-1].value# 768 cls向量的维度，也是768，和词嵌入一个维度
 
+  # 定义用于全连接层的权重变量，将 CLS 嵌入输入映射到每个标签对应的维度
+  # 这里输出维度为 [num_labels, hidden_size]，例如二分类时 num_labels=2，hidden_size=768
   output_weights = tf.get_variable(# 将cls嵌入输入到一个全连接层
       "output_weights", [num_labels, hidden_size],# num_labels=2，2分类，hidden_size=768
       initializer=tf.truncated_normal_initializer(stddev=0.02))
 
+  # 定义全连接层的偏置变量，维度为 [num_labels]
   output_bias = tf.get_variable(
       "output_bias", [num_labels], initializer=tf.zeros_initializer())
 
   with tf.variable_scope("loss"):
     if is_training:
-      # I.e., 0.1 dropout
+      # 如果处于训练阶段，则对输出层应用 dropout（保留比例 0.9，即 dropout rate 为 0.1）
       output_layer = tf.nn.dropout(output_layer, keep_prob=0.9)
 
-    logits = tf.matmul(output_layer, output_weights, transpose_b=True)
-    logits = tf.nn.bias_add(logits, output_bias)
-    probabilities = tf.nn.softmax(logits, axis=-1)
-    log_probs = tf.nn.log_softmax(logits, axis=-1)
+    # 计算 logits，即未归一化的预测值
+    logits = tf.matmul(output_layer, output_weights, transpose_b=True)# 通过矩阵乘法将输出层与转置后的权重矩阵相乘
+    logits = tf.nn.bias_add(logits, output_bias)# 加上偏置项
+    probabilities = tf.nn.softmax(logits, axis=-1)# 计算预测的概率分布（softmax 在最后一维上进行归一化）
+    log_probs = tf.nn.log_softmax(logits, axis=-1)# 计算 log softmax，用于后续交叉熵损失的计算
 
-    one_hot_labels = tf.one_hot(labels, depth=num_labels, dtype=tf.float32)
+    one_hot_labels = tf.one_hot(labels, depth=num_labels, dtype=tf.float32)# 将标签转换为 one-hot 编码，深度为 num_labels，数据类型为 float32
 
-    per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)
-    loss = tf.reduce_mean(per_example_loss)
+    # 计算每个样本的交叉熵损失
+    per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)# 对于每个样本，计算 one_hot_labels 与 log_probs 的乘积后求和，再取负值
+    loss = tf.reduce_mean(per_example_loss)# 计算所有样本的平均损失
 
+    # 返回总损失、每个样本的损失、logits 以及预测的概率分布
     return (loss, per_example_loss, logits, probabilities)
 
 
@@ -653,17 +674,22 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
+    #### 终于到了非常非常重要的创建模型的阶段，点进去看，这里只是定义了模型还没开始训练
     (total_loss, per_example_loss, logits, probabilities) = create_model(
         bert_config, is_training, input_ids, input_mask, segment_ids, label_ids,
         num_labels, use_one_hot_embeddings)
 
+    # 获取当前图中所有需要训练的变量，当前图是被create_model这个函数创建出来的，这里和pytorch非常不一样，有点难理解
     tvars = tf.trainable_variables()
+    # 初始化一个空字典，用于存储从 checkpoint 中初始化的变量名称
     initialized_variable_names = {}
-    scaffold_fn = None
+    scaffold_fn = None# scaffold_fn 用于 TPU 模式下的构建辅助，初始设为 None
+    # 如果提供了预训练的 checkpoint，则进行变量映射和初始化
     if init_checkpoint:
+      # 从预训练的 checkpoint 中获取变量映射关系 assignment_map 和已初始化变量的名称列表
       (assignment_map, initialized_variable_names
       ) = modeling.get_assignment_map_from_checkpoint(tvars, init_checkpoint)
-      if use_tpu:
+      if use_tpu:# 如果使用 TPU，则需要定义一个 scaffold 函数，这里不用管
 
         def tpu_scaffold():
           tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
@@ -671,52 +697,63 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
         scaffold_fn = tpu_scaffold
       else:
+        # 如果不使用 TPU，则直接将预训练的 checkpoint 中的变量值初始化到当前图中的变量，这里就是加载预训练模型参数的步骤，非常重要哦
         tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
 
+    # 输出所有可训练变量的信息
     tf.logging.info("**** Trainable Variables ****")
     for var in tvars:
+      # 如果变量从 checkpoint 中初始化，则记录标记信息
       init_string = ""
       if var.name in initialized_variable_names:
         init_string = ", *INIT_FROM_CKPT*"
+      # 打印变量的名称、形状以及是否从 checkpoint 中初始化的标记
       tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
                       init_string)
-
+    # 定义返回的输出规范，初始设为 None
     output_spec = None
+    # 根据当前模式（训练、评估或预测）构建不同的 Estimator 规范
     if mode == tf.estimator.ModeKeys.TRAIN:
-
+      # 如果是训练模式，创建训练操作（train_op）
       train_op = optimization.create_optimizer(
-          total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+          total_loss,       # 总损失
+          learning_rate,    # 学习率
+          num_train_steps,  # 总训练步数
+          num_warmup_steps, # 预热步数
+          use_tpu)          # 是否使用 TPU
 
+      # 为 TPU 训练创建 TPUEstimatorSpec，包括模式、损失、训练操作以及 scaffold_fn
       output_spec = tf.contrib.tpu.TPUEstimatorSpec(
           mode=mode,
           loss=total_loss,
           train_op=train_op,
           scaffold_fn=scaffold_fn)
     elif mode == tf.estimator.ModeKeys.EVAL:
-
+       # 如果是评估模式，定义评估指标函数
       def metric_fn(per_example_loss, label_ids, logits, is_real_example):
-        predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
-        accuracy = tf.metrics.accuracy(
+        predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)# 根据 logits 得到预测类别
+        accuracy = tf.metrics.accuracy(# 计算准确率，权重为 is_real_example（用于忽略 padding 部分等无效样本）
             labels=label_ids, predictions=predictions, weights=is_real_example)
-        loss = tf.metrics.mean(values=per_example_loss, weights=is_real_example)
-        return {
+        loss = tf.metrics.mean(values=per_example_loss, weights=is_real_example)# 计算平均损失
+        return {# 返回评估指标字典
             "eval_accuracy": accuracy,
             "eval_loss": loss,
         }
 
-      eval_metrics = (metric_fn,
+      eval_metrics = (metric_fn,# 将评估指标函数和相关张量打包为元组
                       [per_example_loss, label_ids, logits, is_real_example])
-      output_spec = tf.contrib.tpu.TPUEstimatorSpec(
+      output_spec = tf.contrib.tpu.TPUEstimatorSpec(# 为 TPU 评估创建 TPUEstimatorSpec，包括模式、损失、评估指标以及 scaffold_fn
           mode=mode,
           loss=total_loss,
           eval_metrics=eval_metrics,
           scaffold_fn=scaffold_fn)
     else:
+      # 对于预测模式，构建包含预测结果（这里是概率）的 TPUEstimatorSpec
       output_spec = tf.contrib.tpu.TPUEstimatorSpec(
           mode=mode,
           predictions={"probabilities": probabilities},
           scaffold_fn=scaffold_fn)
-    return output_spec
+    return output_spec# 返回构建好的 TPUEstimatorSpec，供 Estimator 使用
 
   return model_fn
 
@@ -810,17 +847,19 @@ def main(_):
   if not FLAGS.do_train and not FLAGS.do_eval and not FLAGS.do_predict:
     raise ValueError(
         "At least one of `do_train`, `do_eval` or `do_predict' must be True.")
-
+  # 首先通过命令行参数bert_config.json文件加载配置
   bert_config = modeling.BertConfig.from_json_file(FLAGS.bert_config_file)
 
+  # 如果命令行参数的最大序列长度大于配置文件中的最大位置编码长度，要报错，不能使用max_seq_length序列长度，因为Bert模型只被训练到max_position_embeddings序列长度
   if FLAGS.max_seq_length > bert_config.max_position_embeddings:
     raise ValueError(
         "Cannot use sequence length %d because the BERT model "
         "was only trained up to sequence length %d" %
         (FLAGS.max_seq_length, bert_config.max_position_embeddings))
-
+  # 创建命令行参数中的输出文件夹
   tf.gfile.MakeDirs(FLAGS.output_dir)
 
+  # 根据任务名来获取对应的参数处理器processor
   task_name = FLAGS.task_name.lower()
 
   if task_name not in processors:
@@ -830,9 +869,10 @@ def main(_):
 
   label_list = processor.get_labels()
 
+  # 分词器这里使用的是结合了Basic和WordPiece分词器的全分词器，可以将词分成子词，在当时已经是很好的选择了，现在不知
   tokenizer = tokenization.FullTokenizer(
       vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
-
+  # 这一部分就可以先不用关心了
   tpu_cluster_resolver = None
   if FLAGS.use_tpu and FLAGS.tpu_name:
     tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
@@ -852,27 +892,29 @@ def main(_):
   train_examples = None
   num_train_steps = None
   num_warmup_steps = None
+  # 如果命令行参数说要训练
   if FLAGS.do_train:
-    # 把数据一行一行读进来，仅此而以，见MRPC类的get_train_examples函数，3668行
+    # 把数据一行一行读进来变成样本，仅此而以，见MRPCProcessor类的get_train_examples函数，3668行数据
+    # 这里的train_examples是InputExample类型的列表
     train_examples = processor.get_train_examples(FLAGS.data_dir)
     # 迭代次数=3668/batch_size*epochs
     num_train_steps = int(
         len(train_examples) / FLAGS.train_batch_size * FLAGS.num_train_epochs)
     # 学习率先小后大
     num_warmup_steps = int(num_train_steps * FLAGS.warmup_proportion)
-
-  model_fn = model_fn_builder(
+  #创建模型函数，tensorflow中模型是一个模型函数，这个模型函数包含了模型的前向传播、损失计算等逻辑，之后可以直接传递给 TensorFlow 的 Estimator 用于训练、评估或预测。
+  model_fn = model_fn_builder(#根据传入的参数（例如 BERT 的配置、学习率、标签数量等），构建并返回一个模型函数（model_fn）
       bert_config=bert_config,
       num_labels=len(label_list),
       init_checkpoint=FLAGS.init_checkpoint,
       learning_rate=FLAGS.learning_rate,
       num_train_steps=num_train_steps,
       num_warmup_steps=num_warmup_steps,
-      use_tpu=FLAGS.use_tpu,
-      use_one_hot_embeddings=FLAGS.use_tpu)
+      use_tpu=FLAGS.use_tpu,#是否使用 TPU 来加速训练
+      use_one_hot_embeddings=FLAGS.use_tpu)#是否在嵌入层使用 one-hot 编码，这里通常在使用 TPU 时会设为 True，
 
-  # If TPU is not available, this will fall back to normal Estimator on CPU
-  # or GPU.
+  # 如果没有 TPU 可用，则会自动回退到在 CPU 或 GPU 上运行的普通 Estimator。我的会到gpu上
+  # 为模型创建estimator，可以这么理解，这个以后就是我们模型的代理对象了，训练评估等都由它来执行
   estimator = tf.contrib.tpu.TPUEstimator(
       use_tpu=FLAGS.use_tpu,
       model_fn=model_fn,
@@ -881,48 +923,53 @@ def main(_):
       eval_batch_size=FLAGS.eval_batch_size,
       predict_batch_size=FLAGS.predict_batch_size)
 
-# 这里是真正的数据预处理的模块
+  # 这里是真正的数据预处理的模块
   if FLAGS.do_train:
     train_file = os.path.join(FLAGS.output_dir, "train.tf_record")
+    # 把训练样本转成特征，这里不仅是转成特征了，还写到tfRecoder里了，这个函数需要点进去看
     file_based_convert_examples_to_features(
         train_examples, label_list, FLAGS.max_seq_length, tokenizer, train_file)
+    # 输出一些东西看
     tf.logging.info("***** Running training *****")
     tf.logging.info("  Num examples = %d", len(train_examples))
     tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
     tf.logging.info("  Num steps = %d", num_train_steps)
-    train_input_fn = file_based_input_fn_builder(
+    train_input_fn = file_based_input_fn_builder(#构建一个“输入函数”，类似于dataloader，自动给模型输入数据
         input_file=train_file,
         seq_length=FLAGS.max_seq_length,
         is_training=True,
         drop_remainder=True)
+    # 开始用estimator进行训练吧！！！
     estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
 
   if FLAGS.do_eval:
+    # 把数据一行一行读进来变成样本，仅此而以，见MRPCProcessor类的get_dev_examples函数
+    # 这里的eval_examples是InputExample类型的列表
     eval_examples = processor.get_dev_examples(FLAGS.data_dir)
-    num_actual_eval_examples = len(eval_examples)
+    num_actual_eval_examples = len(eval_examples)#验证集样本数
     if FLAGS.use_tpu:
-      # TPU requires a fixed batch size for all batches, therefore the number
-      # of examples must be a multiple of the batch size, or else examples
-      # will get dropped. So we pad with fake examples which are ignored
-      # later on. These do NOT count towards the metric (all tf.metrics
-      # support a per-instance weight, and these get a weight of 0.0).
+      # TPU 要求所有批次的批量大小都固定，因此样本数量必须是批量大小的整数倍，
+      # 否则多余的样本将被丢弃。
+      # 为了解决这个问题，我们会用虚假的样本对批次进行填充，
+      # 这些虚假样本在后续计算中会被忽略，
+      # 并且它们不会被计入指标计算（所有 tf.metrics 都支持为每个样本指定权重，而这些虚假样本的权重设置为 0.0）。
       while len(eval_examples) % FLAGS.eval_batch_size != 0:
         eval_examples.append(PaddingInputExample())
-
+    #验证集路径拼接
     eval_file = os.path.join(FLAGS.output_dir, "eval.tf_record")
+    # 把验证样本转成特征，这里不仅是转成特征了，还写到tfRecoder里了
     file_based_convert_examples_to_features(
         eval_examples, label_list, FLAGS.max_seq_length, tokenizer, eval_file)
-
+    # 输出一些东西看
     tf.logging.info("***** Running evaluation *****")
     tf.logging.info("  Num examples = %d (%d actual, %d padding)",
                     len(eval_examples), num_actual_eval_examples,
                     len(eval_examples) - num_actual_eval_examples)
     tf.logging.info("  Batch size = %d", FLAGS.eval_batch_size)
 
-    # This tells the estimator to run through the entire set.
+    # 这告诉 Estimator 遍历整个数据集。
     eval_steps = None
-    # However, if running eval on the TPU, you will need to specify the
-    # number of steps.
+    # 但是，如果在 TPU 上进行评估，就需要指定评估的步数。
     if FLAGS.use_tpu:
       assert len(eval_examples) % FLAGS.eval_batch_size == 0
       eval_steps = int(len(eval_examples) // FLAGS.eval_batch_size)
