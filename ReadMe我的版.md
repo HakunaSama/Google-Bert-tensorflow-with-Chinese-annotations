@@ -9,15 +9,16 @@
 对在阅读本份源码的时候需要您有基本的transformer的知识。
 
 对run_classifier.py文件的配置中写入以下参数：
---task_name=MRPC\
---do_train=true\
---do_eval=true\
---data_dir=../GLUE/glue_data/MRPC\
---vocab_file=../GLUE/BERT_BASE_DIR/chinese_L-12_H-768_A-12/vocab.txt\
---bert_config_file=../GLUE/BERT_BASE_DIR/chinese_L-12_H-768_A-12/bert_config.json\
---init_checkpoint=../GLUE/BERT_BASE_DIR/chinese_L-12_H-768_A-12/bert_model.ckpt\
---max_seq_length=128\
---train_batch_size=8\（这里是因为本人电脑性能限制，所以调小了，官方的是32）
---learning_rate=2e-5\
---num_train_epochs=3.0\
+
+--task_name=MRPC
+--do_train=True
+--do_eval=True
+--data_dir=../GLUE/glue_data/MRPC
+--vocab_file=../GLUE/BERT_BASE_DIR/chinese_L-12_H-768_A-12/vocab.txt
+--bert_config_file=../GLUE/BERT_BASE_DIR/chinese_L-12_H-768_A-12/bert_config.json
+--init_checkpoint=../GLUE/BERT_BASE_DIR/chinese_L-12_H-768_A-12/bert_model.ckpt
+--max_seq_length=128
+--train_batch_size=8
+--learning_rate=2e-5
+--num_train_epochs=3.0
 --output_dir=../GLUE/output/
